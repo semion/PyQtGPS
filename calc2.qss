@@ -1,0 +1,36 @@
+QWidget {
+   background-color: green;
+}
+QLineEdit, QFrame, QGroupBox {
+    border-width: 2px;
+    border-style: solid;
+    border-color: darkkhaki;
+    border-radius: 5px;
+    background-color: transparent;
+}
+
+QPushButton {
+    background-color: transparent;
+}
+QPushButton:hover {
+   background-color: khaki;
+}
+QPushButton:pressed {
+    padding-left: 2px;
+    padding-top: 3px;
+    background-color: #d0d67c;
+}
+QLabel, QAbstractButton {
+    font: bold;
+}
+Button1{
+	background-color: red;
+	}
+QGroupBox::title {
+    top: -4px;
+}
+QPushButton#btn2 {
+    background-color: blue;
+}
+MyLabel {
+	border : 0}

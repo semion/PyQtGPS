@@ -3,23 +3,21 @@
 
 # pygps.py
 
-import sys, os, re, math, datetime, bluetooth, signal
+import sys, os, re, math, datetime, bluetooth
 from PyQt4 import QtCore, QtGui
 from globalmaptiles import GlobalMercator
 from gpsparser import GPSString
 from tilegrid import TileGrid
 from renderarea import RenderArea
-from BT_2 import *
-from PyQt4.Qt import *
-from ProgressBar import *        
+from BT import *
+        
 
 class Pygps(QtGui.QWidget):
     '''PyGPS application by Semion Spivak and Boris Shterenberg'''
     def __init__(self, parent = None):
         
         QtGui.QWidget.__init__(self, parent)
-        self.deviceAddress = Bluetooth_Search(self)
-        self.deviceAddress.start()
+        
         self.sysPath = os.path.join(sys.path[0], "")
         #self.deviceAddress = Bluetooth_Search(self)
         #self.deviceStatus = Bluetooth_Search(self)
@@ -37,29 +35,27 @@ class Pygps(QtGui.QWidget):
         self.renderArea.move(0,0)
         
         #label lat lon
-        self.label_latlon = PanelLabel(self)
-        self.label_latlon.setMinimumSize(135, 65)
+        self.label_latlon = QtGui.QLabel(self)
+        self.label_latlon.setMinimumSize(135, 45)
         self.label_latlon.move(0,0)
         self.label_latlon.show()
         
         #zoom buttons
         self.zoomin_button = self.createButton("+", QtGui.QColor("white"), self.zoomIn)       
         self.zoomout_button = self.createButton("-", QtGui.QColor("white"), self.zoomOut)
-        self.zoom_label = QLabel()
-        self.setZoomLabelText()
+        
         #zoom panel - zoom buttons container
-        self.zoom_panel = PanelLabel(self)
-        self.zoom_panel.setMinimumSize(40, 80)
+        self.zoom_panel = QtGui.QLabel(self)
+        self.zoom_panel.setMinimumSize(40, 60)
         zoom_layout = QtGui.QVBoxLayout()        
         zoom_layout.addWidget(self.zoomin_button)
-        zoom_layout.addWidget(self.zoom_label)
         zoom_layout.addWidget(self.zoomout_button)
         self.zoom_panel.setLayout(zoom_layout)
-        self.zoom_panel.move(0,75)
+        self.zoom_panel.move(0,60)
         self.zoom_panel.show()
         
         #self.settings_panel = QtGui.QLabel(self)
-        self.settings_panel = MyLabel(self)
+        self.settings_panel = Pygps.MyLabel(self)
         self.settings_panel.setMinimumSize(40, 40)
         self.settings_panel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignCenter)
         self.settings_panel.setPixmap(QtGui.QPixmap("./32px-Crystal_Clear_action_configure.png"))
@@ -67,37 +63,25 @@ class Pygps(QtGui.QWidget):
         self.settings_panel.move(size.width()-40, 0)
         self.settings_panel.show()
         
-        self.bt_panel = MyLabel(self)
+        self.bt_panel = Pygps.MyLabel(self)
         self.bt_panel.setMinimumSize(40, 40)
         self.bt_panel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignCenter)
         self.bt_panel.setPixmap(QtGui.QPixmap("./Bluetooth_32.png"))
         #size =  self.geometry()
         self.bt_panel.move(size.width()-40, 42)
         self.bt_panel.show()
-        self.bt_panel.setEnabled(False)
+
         
-        self.speed_panel = PanelLabel(self)
+        self.speed_panel = QtGui.QLabel(self)
         self.speed_panel.setMinimumSize(160, 35)
         self.speed_panel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
         #print self.speed_panel.alignment()
         self.speed_panel.setObjectName("speed")
         self.speed_panel.move(size.width()/2 - 75, size.height() - 35)
-        
-        self.time_panel = PanelLabel(self)
-        self.time_panel.setMinimumSize(160, 35)
-        self.time_panel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignRight)
-        #print self.speed_panel.alignment()
-        self.time_panel.setObjectName("time")
-        self.time_panel.move(0, size.height() - 35)
 
-        #self.connect(self.bt_panel,PYSIGNAL("sigClicked"),
-         #            self.CallConnect)
-        self.connect(self.bt_panel, SIGNAL('sigclicked()'),
-                        self.CallConnect)
-        self.connect(self.deviceAddress, SIGNAL('btn_on()'),self.btn_Enable)
         
-        self.connect(self.deviceAddress, SIGNAL('refresh()'), self.RefreshBtnSearch)
-                
+        
+        
         self.olddata = ""
  
         #add zoom buttons
@@ -107,17 +91,6 @@ class Pygps(QtGui.QWidget):
         #center the main window in the desktop
         self.center()
         self.timer = QtCore.QTimer()
-        
-        
-    def setZoomLabelText(self):
-        self.zoom_label.setText(self.tr("<span style='color: white; font-size: 16px; " + \
-                        "font-family:Monospace; font-weight:bold; '>" + \
-                        str(self.renderArea.tilegrid.zoomlevel) + "</span>"))
-        
-    def btn_Enable(self):
-        self.bt_panel.setEnabled(True)
-        
-           
     def drawMap(self):
         if self.logging and self.online:
             self.logfh = open(self.logFileName, "w")
@@ -143,23 +116,20 @@ class Pygps(QtGui.QWidget):
             self.connect(self.timer,  QtCore.SIGNAL("timeout()"),  self.readLog)
             self.timer.start(1000/13) #1 second
             
-        
     def createButton(self, text, color, member):
         button = Button(text, color)
         self.connect(button, QtCore.SIGNAL("clicked()"), member)
         return button
     
-    def updateLabelLatLon(self, lat, lon, hd):
-        self.label_latlon.setText(self.trUtf8("lat:%.6f°\nlon:%.6f°\nheading:%.1f°" % (lat, lon, hd)))
+    def updateLabelLatLon(self, lat, lon):
+        self.label_latlon.setText(self.tr("lat:%.6f\nlon:%.6f" % (lat, lon)))
         
     def zoomIn(self):
         self.renderArea.tilegrid.zoomIn()
-        self.setZoomLabelText()
         self.renderArea.update()
     
     def zoomOut(self):
         self.renderArea.tilegrid.zoomOut()
-        self.setZoomLabelText()
         self.renderArea.update()
             
     def center(self):
@@ -192,7 +162,6 @@ class Pygps(QtGui.QWidget):
         self.settings_panel.move(size.width()-40, 0)
         self.speed_panel.move(size.width()/2 - 75, size.height() - 35)
         self.bt_panel.move(size.width()-40,42)
-        self.time_panel.move(0,size.height()-35)
         event.accept()
 
     def readBTData(self):
@@ -214,7 +183,6 @@ class Pygps(QtGui.QWidget):
                     #print line                        
                     try:
                         
-                        ber = self.renderArea.tilegrid.bearing
                         gps = GPSString(line)
                         PCtime = gps.stripisotime()
                         try:
@@ -232,13 +200,11 @@ class Pygps(QtGui.QWidget):
                         if gps.hdop < 6 :
                             
                             if gps.id == 3:
-                                self.time_panel.setText(self.tr("TIME: %s "%gps.datetime))
                                 self.speed_panel.setText(self.tr("%.1f km/h" % gps.kmph))
                                 self.renderArea.tilegrid.setBearing(gps.cog)                        
                             if gps.id == 1:    
-                                self.time_panel.setText(self.tr(gps.stripisotime))
                                 self.renderArea.tilegrid.moveTo(gps.latitude, gps.longitude, False)
-                                self.updateLabelLatLon(gps.latitude, gps.longitude,ber )                            
+                                self.updateLabelLatLon(gps.latitude, gps.longitude)                            
                                 
                                 self.renderArea.update()
                             #print "bearing:" + gps.cog + ", knots:" + gps.knots
@@ -267,13 +233,12 @@ class Pygps(QtGui.QWidget):
                     return 
             
         try:                
-            ber = self.renderArea.tilegrid.bearing
             gps = GPSString(line)
-#            PCtime = gps.stripisotime()
-#            try:
-#                gps.date = PCtime.date()
-#            except:
-#                gps.date = datetime.datetime.utcnow().date()
+            PCtime = gps.stripisotime()
+            try:
+                gps.date = PCtime.date()
+            except:
+                gps.date = datetime.datetime.utcnow().date()
             try:
                 gps.parse()
             except gps.FailedChecksum:
@@ -284,61 +249,30 @@ class Pygps(QtGui.QWidget):
                                            
                 if gps.id == 3:
                     #self.renderArea.tilegrid.setBearing(gps.cog)                        
-                    self.time_panel.setText(self.tr("TIME: %s "%gps.datetime))
                     self.speed_panel.setText(self.tr("%.1f <small>km/h</small>" % gps.kmph))
                 self.renderArea.tilegrid.moveTo(gps.latitude, gps.longitude, True)
-                self.updateLabelLatLon(gps.latitude, gps.longitude,ber)                            
+                self.updateLabelLatLon(gps.latitude, gps.longitude)                            
                 self.renderArea.update()
                 print "bearing:" + gps.cog + ", knots:" + gps.knots                           
         except:
                 pass
         
-    def RefreshBtnSearch(self):
-        self.deviceAddress.exit()
-        print "Refreshing"
-        self.deviceAddress.start()
-        
-    def CallConnect(self):
-        #print "Connect"
-#        self.deviceAddress = Bluetooth_Search(self)
-#        self.deviceAddress.start()
-#        self.bar = ProgressBar(self)
-#        self.bar.timer1.start(100,self)
-#        self.bar.show()
-        self.list = QStringList()
-        self.list =self.deviceAddress.GetApp()
-        self.deviceId= False
-        l1,ok= QInputDialog.getItem(self,self.tr("Select Device"),self.tr("Device"),self.list,0,False)
-        if ok and not l1.isEmpty():
-                #print str(l1).split("   ")
-                
-                self.deviceName,self.deviceId = str(l1).split("   ")
-                print self.deviceId
-        else:
-                self.deviceId= False
-                QMessageBox.about(self, self.tr("WARNING!!!"),
-                self.trUtf8('Application is OFFLINE!'))
-        
-        
-        self.online = self.deviceId
-        self.callGps = self.drawMap()
-        
-        
-        
-        
-class MyLabel(QLabel):
-    def __init__(self, parent = None):
-        QLabel.__init__(self,parent)
-        self.mainparent = parent
-        #self.callGps = Pygps()
-    
-    
-    def mouseDoubleClickEvent(self,event):
-        self.emit(SIGNAL('sigclicked()'),())
 
-class PanelLabel(QLabel):
-    def __init__(self, parent = None):
-        QLabel.__init__(self,parent) 
+    class MyLabel(QLabel):
+        def __init__(self, parent = None):
+            QLabel.__init__(self,parent)
+            self.mainparent = parent
+            #self.callGps = Pygps()
+        def mousePressEvent(self,event):
+            
+            self.CallConnect()
+            
+        def CallConnect(self):
+            #print "Connect"
+            self.deviceAddress = Bluetooth_Search(self)
+            self.mainparent.online = self.deviceAddress.deviceId
+            self.callGps = self.mainparent.drawMap()
+
 
 class Button(QtGui.QToolButton):
     def __init__(self, text, color, parent=None):
@@ -360,8 +294,6 @@ class Button(QtGui.QToolButton):
     
     
 app = QtGui.QApplication(sys.argv)
-#icon = ProgressBar()
-#icon.show()
 pygps = Pygps()
 pygps.setStyleSheet(open(pygps.sysPath + "pygps.qss", "r").read())
 pygps.show()

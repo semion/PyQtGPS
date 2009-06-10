@@ -55,7 +55,8 @@ class RenderArea(QtGui.QWidget):
         for img in self.tilegrid.images:
             offpx, offpy, fname = img.split(",")      
             image = QtGui.QImage()
-            image.load(self.sysPath + fname)
+#            image.load(self.sysPath + fname)
+            image.load(fname)
             #draw image with offset
             painter.drawImage(-int(offpx), -int(offpy), image)
             #painter.drawRect(-int(offpx), -int(offpy), 256, 256)
