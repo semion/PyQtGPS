@@ -265,6 +265,7 @@ class GPSString(object):
                 self.handle_lon(fields[5], fields[6])
                 self.knots = dec.Decimal(fields[7])
                 self.kmph = self.knots * dec.Decimal('1.85200')
+                self.mph = self.knots * dec.Decimal('1.15078')
                 self.cog = fields[8]
 
         elif self.id == 4:
@@ -393,7 +394,7 @@ class GPSString(object):
                                  dec.Decimal(seconds) ) * 1000000 )
 
         timeval = datetime.time(hour, minute, seconds, microseconds)
-
+        self.gpsTime=timeval
         try:
             self.datetime = datetime.datetime.combine(self.date, timeval)
         except:

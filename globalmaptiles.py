@@ -3,7 +3,7 @@
 # $Id$
 #
 # Project:	GDAL2Tiles, Google Summer of Code 2007 & 2008
-#           Global Map Tiles Classes
+#		   Global Map Tiles Classes
 # Purpose:	Convert a raster into TMS tiles, create KML SuperOverlay EPSG:4326,
 #			generate a simple HTML viewers based on Google Maps and OpenLayers
 # Author:	Klokan Petr Pridal, klokan at klokan dot cz
@@ -30,6 +30,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 ###############################################################################
+from decimal import getcontext
 
 """
 globalmaptiles.py
@@ -41,9 +42,9 @@ Functions necessary for generation of global tiles used on the web.
 It contains classes implementing coordinate conversions for:
 
   - GlobalMercator (based on EPSG:900913 = EPSG:3785)
-       for Google Maps, Yahoo Maps, Microsoft Maps compatible tiles
+	   for Google Maps, Yahoo Maps, Microsoft Maps compatible tiles
   - GlobalGeodetic (based on EPSG:4326)
-       for OpenLayers Base Map and Google Earth compatible tiles
+	   for OpenLayers Base Map and Google Earth compatible tiles
 
 More info at:
 
@@ -81,23 +82,23 @@ class GlobalMercator(object):
 
 	What coordinate conversions do we need for TMS Global Mercator tiles::
 
-	     LatLon      <->       Meters      <->     Pixels    <->       Tile     
+		 LatLon	  <->	   Meters	  <->	 Pixels	<->	   Tile	 
 
 	 WGS84 coordinates   Spherical Mercator  Pixels in pyramid  Tiles in pyramid
-	     lat/lon            XY in metres     XY pixels Z zoom      XYZ from TMS 
-	    EPSG:4326           EPSG:900913                                         
-	     .----.              ---------               --                TMS      
-	    /      \     <->     |       |     <->     /----/    <->      Google    
-	    \      /             |       |           /--------/          QuadTree   
-	     -----               ---------         /------------/                   
-	   KML, public         WebMapService         Web Clients      TileMapService
+		 lat/lon			XY in metres	 XY pixels Z zoom	  XYZ from TMS 
+		EPSG:4326		   EPSG:900913										 
+		 .----.			  ---------			   --				TMS	  
+		/	  \	 <->	 |	   |	 <->	 /----/	<->	  Google	
+		\	  /			 |	   |		   /--------/		  QuadTree   
+		 -----			   ---------		 /------------/				   
+	   KML, public		 WebMapService		 Web Clients	  TileMapService
 
 	What is the coordinate extent of Earth in EPSG:900913?
 
 	  [-20037508.342789244, -20037508.342789244, 20037508.342789244, 20037508.342789244]
 	  Constant 20037508.342789244 comes from the circumference of the Earth in meters,
 	  which is 40 thousand kilometers, the coordinate origin is in the middle of extent.
-      In fact you can calculate the constant as: 2 * math.pi * 6378137 / 2.0
+	  In fact you can calculate the constant as: 2 * math.pi * 6378137 / 2.0
 	  $ echo 180 85 | gdaltransform -s_srs EPSG:4326 -t_srs EPSG:900913
 	  Polar areas with abs(latitude) bigger then 85.05112878 are clipped off.
 
@@ -141,141 +142,154 @@ class GlobalMercator(object):
 	  EPSG database.
 
 	  Proj4 Text:
-	    +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0
-	    +k=1.0 +units=m +nadgrids=@null +no_defs
+		+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0
+		+k=1.0 +units=m +nadgrids=@null +no_defs
 
 	  Human readable WKT format of EPGS:900913:
-	     PROJCS["Google Maps Global Mercator",
-	         GEOGCS["WGS 84",
-	             DATUM["WGS_1984",
-	                 SPHEROID["WGS 84",6378137,298.2572235630016,
-	                     AUTHORITY["EPSG","7030"]],
-	                 AUTHORITY["EPSG","6326"]],
-	             PRIMEM["Greenwich",0],
-	             UNIT["degree",0.0174532925199433],
-	             AUTHORITY["EPSG","4326"]],
-	         PROJECTION["Mercator_1SP"],
-	         PARAMETER["central_meridian",0],
-	         PARAMETER["scale_factor",1],
-	         PARAMETER["false_easting",0],
-	         PARAMETER["false_northing",0],
-	         UNIT["metre",1,
-	             AUTHORITY["EPSG","9001"]]]
+		 PROJCS["Google Maps Global Mercator",
+			 GEOGCS["WGS 84",
+				 DATUM["WGS_1984",
+					 SPHEROID["WGS 84",6378137,298.2572235630016,
+						 AUTHORITY["EPSG","7030"]],
+					 AUTHORITY["EPSG","6326"]],
+				 PRIMEM["Greenwich",0],
+				 UNIT["degree",0.0174532925199433],
+				 AUTHORITY["EPSG","4326"]],
+			 PROJECTION["Mercator_1SP"],
+			 PARAMETER["central_meridian",0],
+			 PARAMETER["scale_factor",1],
+			 PARAMETER["false_easting",0],
+			 PARAMETER["false_northing",0],
+			 UNIT["metre",1,
+				 AUTHORITY["EPSG","9001"]]]
 	"""
 
 	def __init__(self, tileSize=256):
-		"Initialize the TMS Global Mercator pyramid"
+		'''Initialize the TMS Global Mercator pyramid'''
 		self.tileSize = tileSize
 		self.initialResolution = 2 * math.pi * 6378137 / self.tileSize
 		# 156543.03392804062 for tileSize 256 pixels
-		self.originShift = 2 * math.pi * 6378137 / 2.0
+		self.originShift = math.pi * 6378137
 		# 20037508.342789244
 
-	def LatLonToMeters(self, lat, lon ):
+	def LatLonToMeters(self, lat, lon):
 		"Converts given lat/lon in WGS84 Datum to XY in Spherical Mercator EPSG:900913"
-
 		mx = lon * self.originShift / 180.0
-		my = math.log( math.tan((90 + lat) * math.pi / 360.0 )) / (math.pi / 180.0)
-
-		my = my * self.originShift / 180.0
+		my = 6378137 * math.log(math.tan((90 + lat) * math.pi / 360.0))
 		return mx, my
 
-	def MetersToLatLon(self, mx, my ):
-		"Converts XY point from Spherical Mercator EPSG:900913 to lat/lon in WGS84 Datum"
+	def MetersToLatLon(self, mx, my):
+		'''Converts XY point from Spherical Mercator EPSG:900913 to lat/lon in WGS84 Datum'''
 
 		lon = (mx / self.originShift) * 180.0
 		lat = (my / self.originShift) * 180.0
 
-		lat = 180 / math.pi * (2 * math.atan( math.exp( lat * math.pi / 180.0)) - math.pi / 2.0)
+		lat = 180 / math.pi * (2 * math.atan(math.exp(lat * math.pi / 180.0)) - math.pi / 2.0)
 		return lat, lon
 
 	def PixelsToMeters(self, px, py, zoom):
 		"Converts pixel coordinates in given zoom level of pyramid to EPSG:900913"
 
-		res = self.Resolution( zoom )
+		res = self.Resolution(zoom)
 		mx = px * res - self.originShift
 		my = py * res - self.originShift
 		return mx, my
-		
+
 	def MetersToPixels(self, mx, my, zoom):
 		"Converts EPSG:900913 to pyramid pixel coordinates in given zoom level"
-				
-		res = self.Resolution( zoom )
+
+		res = self.Resolution(zoom)
 		px = (mx + self.originShift) / res
 		py = (my + self.originShift) / res
 		return px, py
-	
+
+	def MetersToPixelsInt(self, mx, my, zoom):
+		"Converts EPSG:900913 to pyramid pixel coordinates in given zoom level"
+
+		res = self.Resolution(zoom)
+		px = (mx + self.originShift) / res
+		py = (my + self.originShift) / res
+		return int(px), int(py)
+
 	def PixelsToTile(self, px, py):
 		"Returns a tile covering region in given pixel coordinates"
 
-		tx = int( math.ceil( px / float(self.tileSize) ) - 1 )
-		ty = int( math.ceil( py / float(self.tileSize) ) - 1 )
+		tx = int(math.floor(px / float(self.tileSize)))
+		ty = int(math.floor(py / float(self.tileSize)))
 		return tx, ty
 
 	def PixelsToRaster(self, px, py, zoom):
 		"Move the origin of pixel coordinates to top-left corner"
-		
+
 		mapSize = self.tileSize << zoom
 		return px, mapSize - py
-		
+
 	def MetersToTile(self, mx, my, zoom):
 		"Returns tile for given mercator coordinates"
-		
-		px, py = self.MetersToPixels( mx, my, zoom)
-		return self.PixelsToTile( px, py)
+
+		px, py = self.MetersToPixels(mx, my, zoom)
+		return self.PixelsToTile(px, py)
 
 	def TileBounds(self, tx, ty, zoom):
 		"Returns bounds of the given tile in EPSG:900913 coordinates"
-		
-		minx, miny = self.PixelsToMeters( tx*self.tileSize, ty*self.tileSize, zoom )
-		maxx, maxy = self.PixelsToMeters( (tx+1)*self.tileSize, (ty+1)*self.tileSize, zoom )
-		return ( minx, miny, maxx, maxy )
 
-	def TileLatLonBounds(self, tx, ty, zoom ):
+		minx, miny = self.PixelsToMeters(tx * self.tileSize, ty * self.tileSize, zoom)
+		maxx, maxy = self.PixelsToMeters((tx + 1) * self.tileSize, (ty + 1) * self.tileSize, zoom)
+		return (minx, miny, maxx, maxy)
+
+	def TileLatLonBounds(self, tx, ty, zoom):
 		"Returns bounds of the given tile in latutude/longitude using WGS84 datum"
 
-		bounds = self.TileBounds( tx, ty, zoom)
+		bounds = self.TileBounds(tx, ty, zoom)
 		minLat, minLon = self.MetersToLatLon(bounds[0], bounds[1])
 		maxLat, maxLon = self.MetersToLatLon(bounds[2], bounds[3])
-		 
-		return ( minLat, minLon, maxLat, maxLon )
-		
-	def Resolution(self, zoom ):
+		return (minLat, minLon, maxLat, maxLon)
+
+	def Resolution(self, zoom):
 		"Resolution (meters/pixel) for given zoom level (measured at Equator)"
-		
+
 		# return (2 * math.pi * 6378137) / (self.tileSize * 2**zoom)
-		return self.initialResolution / (2**zoom)
-		
-	def ZoomForPixelSize(self, pixelSize ):
+		return self.initialResolution / (2 ** zoom)
+
+	def ZoomForPixelSize(self, pixelSize):
 		"Maximal scaledown zoom of the pyramid closest to the pixelSize."
-		
+
 		for i in range(30):
 			if pixelSize > self.Resolution(i):
-				return i-1 if i!=0 else 0 # We don't want to scale up
+				return i - 1 if i != 0 else 0 # We don't want to scale up
 
 	def GoogleTile(self, tx, ty, zoom):
 		"Converts TMS tile coordinates to Google Tile coordinates"
-		
-		# coordinate origin is moved from bottom-left to top-left corner of the extent
-		return tx, (2**zoom - 1) - ty
 
-	def QuadTree(self, tx, ty, zoom ):
+		# coordinate origin is moved from bottom-left to top-left corner of the extent
+		return tx, (2 ** zoom - 1) - ty
+
+	def QuadTree(self, tx, ty, zoom):
 		"Converts TMS tile coordinates to Microsoft QuadTree"
-		
+
 		quadKey = ""
-		ty = (2**zoom - 1) - ty
+		ty = (2 ** zoom - 1) - ty
 		for i in range(zoom, 0, -1):
 			digit = 0
-			mask = 1 << (i-1)
+			mask = 1 << (i - 1)
 			if (tx & mask) != 0:
 				digit += 1
 			if (ty & mask) != 0:
 				digit += 2
 			quadKey += str(digit)
-			
+
 		return quadKey
 
-#---------------------
+	def getDistance(self, start_lat, start_lon, end_lat, end_lon):
+		r = 6378137
+		d_lat = math.radians(end_lat - start_lat)
+		d_lon = math.radians(end_lon - start_lon)
+		a = math.sin(d_lat / 2) ** 2 + math.cos(math.radians(start_lat)) * math.cos(math.radians(end_lat)) * math.sin(d_lon / 2) ** 2
+		c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+		dist = r * c 
+		return dist
+
+
 
 class GlobalGeodetic(object):
 	"""
@@ -300,25 +314,25 @@ class GlobalGeodetic(object):
 	  TMS has coordinate origin (for pixels and tiles) in bottom-left corner.
 	  Rasters are in EPSG:4326 and therefore are compatible with Google Earth.
 
-	     LatLon      <->      Pixels      <->     Tiles     
+		 LatLon	  <->	  Pixels	  <->	 Tiles	 
 
 	 WGS84 coordinates   Pixels in pyramid  Tiles in pyramid
-	     lat/lon         XY pixels Z zoom      XYZ from TMS 
-	    EPSG:4326                                           
-	     .----.                ----                         
-	    /      \     <->    /--------/    <->      TMS      
-	    \      /         /--------------/                   
-	     -----        /--------------------/                
-	   WMS, KML    Web Clients, Google Earth  TileMapService
+		 lat/lon		 XY pixels Z zoom	  XYZ from TMS 
+		EPSG:4326										   
+		 .----.				----						 
+		/	  \	 <->	/--------/	<->	  TMS	  
+		\	  /		 /--------------/				   
+		 -----		/--------------------/				
+	   WMS, KML	Web Clients, Google Earth  TileMapService
 	"""
 
-	def __init__(self, tileSize = 256):
+	def __init__(self, tileSize=256):
 		self.tileSize = tileSize
 
 	def LatLonToPixels(self, lat, lon, zoom):
 		"Converts lat/lon to pixel coordinates in given zoom of the EPSG:4326 pyramid"
 
-		res = 180 / 256.0 / 2**zoom
+		res = 180 / 256.0 / 2 ** zoom
 		px = (180 + lat) / res
 		py = (90 + lon) / res
 		return px, py
@@ -326,30 +340,30 @@ class GlobalGeodetic(object):
 	def PixelsToTile(self, px, py):
 		"Returns coordinates of the tile covering region in pixel coordinates"
 
-		tx = int( math.ceil( px / float(self.tileSize) ) - 1 )
-		ty = int( math.ceil( py / float(self.tileSize) ) - 1 )
+		tx = int(math.ceil(px / float(self.tileSize)) - 1)
+		ty = int(math.ceil(py / float(self.tileSize)) - 1)
 		return tx, ty
 
-	def Resolution(self, zoom ):
+	def Resolution(self, zoom):
 		"Resolution (arc/pixel) for given zoom level (measured at Equator)"
-		
-		return 180 / 256.0 / 2**zoom
+
+		return 180 / 256.0 / 2 ** zoom
 		#return 180 / float( 1 << (8+zoom) )
 
-	def TileBounds(tx, ty, zoom):
+	def TileBounds(self, tx, ty, zoom):
 		"Returns bounds of the given tile"
-		res = 180 / 256.0 / 2**zoom
+		res = 180 / 256.0 / 2 ** zoom
 		return (
-			tx*256*res - 180,
-			ty*256*res - 90,
-			(tx+1)*256*res - 180,
-			(ty+1)*256*res - 90
+			tx * 256 * res - 180,
+			ty * 256 * res - 90,
+			(tx + 1) * 256 * res - 180,
+			(ty + 1) * 256 * res - 90
 		)
 
 if __name__ == "__main__":
 	import sys, os
-		
-	def Usage(s = ""):
+
+	def Usage(s=""):
 		print "Usage: globalmaptiles.py [-profile 'mercator'|'geodetic'] zoomlevel lat lon [latmax lonmax]"
 		print
 		if s:
@@ -374,7 +388,7 @@ if __name__ == "__main__":
 		if arg == '-profile':
 			i = i + 1
 			profile = argv[i]
-		
+
 		if zoomlevel is None:
 			zoomlevel = int(argv[i])
 		elif lat is None:
@@ -389,51 +403,51 @@ if __name__ == "__main__":
 			Usage("ERROR: Too many parameters")
 
 		i = i + 1
-	
+
 	if profile != 'mercator':
 		Usage("ERROR: Sorry, given profile is not implemented yet.")
-	
+
 	if zoomlevel == None or lat == None or lon == None:
 		Usage("ERROR: Specify at least 'zoomlevel', 'lat' and 'lon'.")
 	if latmax is not None and lonmax is None:
 		Usage("ERROR: Both 'latmax' and 'lonmax' must be given.")
-	
+
 	if latmax != None and lonmax != None:
 		if latmax < lat:
 			Usage("ERROR: 'latmax' must be bigger then 'lat'")
 		if lonmax < lon:
 			Usage("ERROR: 'lonmax' must be bigger then 'lon'")
 		boundingbox = (lon, lat, lonmax, latmax)
-	
+
 	tz = zoomlevel
 	mercator = GlobalMercator()
 
-	mx, my = mercator.LatLonToMeters( lat, lon )
+	mx, my = mercator.LatLonToMeters(lat, lon)
 	print "Spherical Mercator (ESPG:900913) coordinates for lat/lon: "
 	print (mx, my)
-	tminx, tminy = mercator.MetersToTile( mx, my, tz )
-	
+	tminx, tminy = mercator.MetersToTile(mx, my, tz)
+
 	if boundingbox:
-		mx, my = mercator.LatLonToMeters( latmax, lonmax )
+		mx, my = mercator.LatLonToMeters(latmax, lonmax)
 		print "Spherical Mercator (ESPG:900913) cooridnate for maxlat/maxlon: "
 		print (mx, my)
-		tmaxx, tmaxy = mercator.MetersToTile( mx, my, tz )
+		tmaxx, tmaxy = mercator.MetersToTile(mx, my, tz)
 	else:
 		tmaxx, tmaxy = tminx, tminy
-		
-	for ty in range(tminy, tmaxy+1):
-		for tx in range(tminx, tmaxx+1):
+
+	for ty in range(tminy, tmaxy + 1):
+		for tx in range(tminx, tmaxx + 1):
 			tilefilename = "%s/%s/%s" % (tz, tx, ty)
 			print tilefilename, "( TileMapService: z / x / y )"
-		
+
 			gx, gy = mercator.GoogleTile(tx, ty, tz)
 			print "\tGoogle:", gx, gy
 			quadkey = mercator.QuadTree(tx, ty, tz)
-			print "\tQuadkey:", quadkey, '(',int(quadkey, 4),')'
-			bounds = mercator.TileBounds( tx, ty, tz)
+			print "\tQuadkey:", quadkey, '(', int(quadkey, 4), ')'
+			bounds = mercator.TileBounds(tx, ty, tz)
 			print
 			print "\tEPSG:900913 Extent: ", bounds
-			wgsbounds = mercator.TileLatLonBounds( tx, ty, tz)
+			wgsbounds = mercator.TileLatLonBounds(tx, ty, tz)
 			print "\tWGS84 Extent:", wgsbounds
 			print "\tgdalwarp -ts 256 256 -te %s %s %s %s %s %s_%s_%s.tif" % (
 				bounds[0], bounds[1], bounds[2], bounds[3], "<your-raster-file-in-epsg900913.ext>", tz, tx, ty)

@@ -18,7 +18,7 @@ class RenderArea(QtGui.QWidget):
     def __init__(self, parent = None):
         QtGui.QWidget.__init__(self, parent)
        
-        self.tilegrid = TileGrid(parent.geometry())
+        self.tilegrid = TileGrid(parent=parent)
         
         self.sysPath = os.path.join(sys.path[0], "")
         
@@ -38,29 +38,27 @@ class RenderArea(QtGui.QWidget):
         #begin paint
         painter.begin(self)        
         
-        #set pen
-        #painter.setPen(QtGui.QPen(QtCore.Qt.black, 1, QtCore.Qt.DotLine))
-        
         #set anti-aliasing hint
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         
         painter.translate(0,0)
-        
-        
-
-        
-        #move coordinates origin to center of renderArea
+#        move coordinates origin to center of renderArea
         painter.translate(self.width()/2, self.height()/2)
         
         for img in self.tilegrid.images:
-            offpx, offpy, fname = img.split(",")      
+            p, fname = img    
             image = QtGui.QImage()
-#            image.load(self.sysPath + fname)
-            image.load(fname)
-            #draw image with offset
-            painter.drawImage(-int(offpx), -int(offpy), image)
-            #painter.drawRect(-int(offpx), -int(offpy), 256, 256)
-        #print self.sysPath + fname
+            image.load(self.tilegrid.mapPath+fname)
+#            draw image with offset
+            painter.drawImage(p, image)
+            
+        painter.setPen(QtGui.QPen(QtCore.Qt.green, 4, QtCore.Qt.DotLine))    
+        painter.drawPolyline(self.tilegrid.pathways)
+        
+        image = QtGui.QImage()
+        image.load("./wp.png")
+        for wp in self.tilegrid.visible_waypoints:
+            painter.drawImage(wp, image)
         
   
         
@@ -75,5 +73,5 @@ class RenderArea(QtGui.QWidget):
 
         painter.end()
         
-        #painter.__del__()
+#        del painter
 

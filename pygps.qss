@@ -6,7 +6,56 @@ PanelLabel, MyLabel {
 	font-family:Monospace;
 	font-weight:bold;
 	}
+QGroupBox,QRadioButton{
 	
+	background-color: transparent;
+	color: white;
+	font-size: 12px;
+	font-family:Monospace;
+	font-weight:bold;
+	}
+MyLabel#Navigation{
+	background: url("./ds40.png");
+	background-color: transparent;
+	color: springgreen;
+	font-size: 20px;
+	font-family:Monospace;
+	font-weight:bold;
+	}
+MyLabel#Log{
+	background: url("./ds40.png");
+	background-color: transparent;
+	color: springgreen;
+	font-size: 20px;
+	font-family:Monospace;
+	font-weight:bold;
+	}
+
+MyLabel#Sett{
+	background: url("./ds40.png");
+	background-color: transparent;
+	color: springgreen;
+	font-size: 20px;
+	font-family:Monospace;
+	font-weight:bold;
+	}
+	MyLabel#Map{
+	background: url("./ds40.png");
+	background-color: transparent;
+	color: springgreen;
+	font-size: 20px;
+	font-family:Monospace;
+	font-weight:bold;
+	}
+MyLabel#Exit{
+	background: url("./ds40.png");
+	background-color: transparent;
+	color: red;
+	font-size: 20px;
+	font-family:Monospace;
+	font-weight:bold;
+	}
+
 PanelLabel#speed {
 	color: yellow;
 	font-size: 24px;
